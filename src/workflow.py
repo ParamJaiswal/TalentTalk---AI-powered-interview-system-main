@@ -21,6 +21,32 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 # PDF generation
 from src.pdf_utils import generate_pdf
 
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
+
+def validate_api_keys():
+    """Validate that required API keys are present."""
+    required_keys = {
+        "GOOGLE_API_KEY": "Google Generative AI"
+    }
+    
+    missing_keys = []
+    for key, service in required_keys.items():
+        if not os.getenv(key):
+            missing_keys.append(f"{service} ({key})")
+    
+    if missing_keys:
+        error_msg = (
+            "Missing required API keys:\n" +
+            "\n".join(f"  - {key}" for key in missing_keys) +
+            "\n\nPlease set these keys in your .env file."
+        )
+        raise EnvironmentError(error_msg)
+
+# Validate API keys before initializing models
+validate_api_keys()
+
 class AgentState(TypedDict):
     mode: str
     num_of_q: int
@@ -128,11 +154,20 @@ report_writer_prompt = PromptTemplate(
 INTERVIEW_QUESTIONS_PDF = "utils/LLM Interview Questions.pdf"
 RESUME_PDF = "utils/Param-Resume.pdf"
 
+# Check if files exist
+if not os.path.exists(INTERVIEW_QUESTIONS_PDF):
+    raise FileNotFoundError(f"Interview questions file not found: {INTERVIEW_QUESTIONS_PDF}")
+if not os.path.exists(RESUME_PDF):
+    raise FileNotFoundError(f"Resume file not found: {RESUME_PDF}")
+
 # Load and split documents
-loader = PyPDFLoader(INTERVIEW_QUESTIONS_PDF)
-pages = loader.load()
-resume_loader = PyPDFLoader(RESUME_PDF)
-resume = resume_loader.load()
+try:
+    loader = PyPDFLoader(INTERVIEW_QUESTIONS_PDF)
+    pages = loader.load()
+    resume_loader = PyPDFLoader(RESUME_PDF)
+    resume = resume_loader.load()
+except Exception as e:
+    raise RuntimeError(f"Error loading PDF files: {str(e)}")
 
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
 pages_split = text_splitter.split_documents(pages)

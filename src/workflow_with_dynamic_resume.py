@@ -26,6 +26,32 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 # PDF generation
 from src.pdf_utils import generate_pdf
 
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
+
+def validate_api_keys():
+    """Validate that required API keys are present."""
+    required_keys = {
+        "GOOGLE_API_KEY": "Google Generative AI"
+    }
+    
+    missing_keys = []
+    for key, service in required_keys.items():
+        if not os.getenv(key):
+            missing_keys.append(f"{service} ({key})")
+    
+    if missing_keys:
+        error_msg = (
+            "Missing required API keys:\n" +
+            "\n".join(f"  - {key}" for key in missing_keys) +
+            "\n\nPlease set these keys in your .env file."
+        )
+        raise EnvironmentError(error_msg)
+
+# Validate API keys before initializing models
+validate_api_keys()
+
 class AgentState(TypedDict):
     mode: str
     num_of_q: int
