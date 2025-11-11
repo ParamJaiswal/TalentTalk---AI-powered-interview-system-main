@@ -26,6 +26,32 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 # PDF generation
 from src.pdf_utils import generate_pdf
 
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
+
+def validate_api_keys():
+    """Validate that required API keys are present."""
+    required_keys = {
+        "GOOGLE_API_KEY": "Google Generative AI"
+    }
+    
+    missing_keys = []
+    for key, service in required_keys.items():
+        if not os.getenv(key):
+            missing_keys.append(f"{service} ({key})")
+    
+    if missing_keys:
+        error_msg = (
+            "Missing required API keys:\n" +
+            "\n".join(f"  - {key}" for key in missing_keys) +
+            "\n\nPlease set these keys in your .env file."
+        )
+        raise EnvironmentError(error_msg)
+
+# Validate API keys before initializing models
+validate_api_keys()
+
 class AgentState(TypedDict):
     mode: str
     num_of_q: int
@@ -56,7 +82,7 @@ interviewer_prompt = PromptTemplate(
         2. `retrieve_resume`: This tool can search the candidate's resume to find information about their past projects and experience. Use this tool to ask relevant projects from their resume like {position} projects.
         Start by introducing yourself as the interviewer and asking the candidate to introduce themselves, then ask use tools to retrive a project of you choice in there resume and ask them about it.
         Focus on questions related to the position and the candidate's resume.
-        You ask only one Introduction question at the beginning of the interview, then one question about a project from there resume then {number_of_questions} questions about the position from the knowledge base with {number_of_followup} flowup question only if there answer was too vage and incomplete.
+        You ask only one Introduction question at the beginning of the interview, then one question about a project from there resume then {number_of_questions} questions about the position from the knowledge base with {number_of_followup} follow-up question only if there answer was too vage and incomplete.
         If asked any irrelevant question, respond with: "Sorry, this is out of scope."
         After the interview is finished you output this sentance exacly: "Thank you, that's it for today."
         if you use any tool print"tool used: `tool_name`"
@@ -65,7 +91,7 @@ interviewer_prompt = PromptTemplate(
         Question one: What challenges do LLMs face in deployment?
         Question twe: What defines a Large Language Model (LLM)?
         `
-        to elistrate between main questions and follow-up questions.
+        to illustrate between main questions and follow-up questions.
         Begin the interview now.
         """
 )
@@ -149,6 +175,10 @@ def initialize_questions_retriever(questions_path=None):
     # Use the provided questions path or fall back to the default
     questions_file = questions_path if questions_path and os.path.exists(questions_path) else INTERVIEW_QUESTIONS_PDF
     
+    # Check if file exists
+    if not os.path.exists(questions_file):
+        raise FileNotFoundError(f"Interview questions file not found: {questions_file}")
+    
     # Generate a unique ID for this session to avoid caching issues
     import uuid
     import time
@@ -157,15 +187,18 @@ def initialize_questions_retriever(questions_path=None):
     
     print(f"Loading interview questions from: {questions_file}")
     
-    # Always create a fresh collection for each request
-    # Load and split the questions
-    loader = PyPDFLoader(questions_file)
-    pages = loader.load()
-    
-    # Print the first few lines of the questions for debugging
-    print(f"Questions content preview: {pages[0].page_content[:100]}...")
-    
-    pages_split = text_splitter.split_documents(pages)
+    try:
+        # Always create a fresh collection for each request
+        # Load and split the questions
+        loader = PyPDFLoader(questions_file)
+        pages = loader.load()
+        
+        # Print the first few lines of the questions for debugging
+        print(f"Questions content preview: {pages[0].page_content[:100]}...")
+        
+        pages_split = text_splitter.split_documents(pages)
+    except Exception as e:
+        raise RuntimeError(f"Error loading interview questions PDF: {str(e)}")
     
     # Initialize the questions vector store with a unique collection name
     questions_vectorstore = Chroma.from_documents(
@@ -201,6 +234,10 @@ def initialize_resume_retriever(resume_path=None):
     # Use the provided resume path or fall back to the default
     resume_file = resume_path if resume_path and os.path.exists(resume_path) else DEFAULT_RESUME_PDF
     
+    # Check if file exists
+    if not os.path.exists(resume_file):
+        raise FileNotFoundError(f"Resume file not found: {resume_file}")
+    
     # Generate a unique ID for this session to avoid caching issues
     import uuid
     import time
@@ -209,15 +246,18 @@ def initialize_resume_retriever(resume_path=None):
     
     print(f"Loading resume from: {resume_file}")
     
-    # Always create a fresh collection for each request
-    # Load and split the resume
-    resume_loader = PyPDFLoader(resume_file)
-    resume = resume_loader.load()
-    
-    # Print the first few lines of the resume for debugging
-    print(f"Resume content preview: {resume[0].page_content[:100]}...")
-    
-    resume_split = text_splitter.split_documents(resume)
+    try:
+        # Always create a fresh collection for each request
+        # Load and split the resume
+        resume_loader = PyPDFLoader(resume_file)
+        resume = resume_loader.load()
+        
+        # Print the first few lines of the resume for debugging
+        print(f"Resume content preview: {resume[0].page_content[:100]}...")
+        
+        resume_split = text_splitter.split_documents(resume)
+    except Exception as e:
+        raise RuntimeError(f"Error loading resume PDF: {str(e)}")
     
     # Initialize the resume vector store with a unique collection name
     resume_vectorstore = Chroma.from_documents(

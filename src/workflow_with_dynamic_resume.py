@@ -26,6 +26,32 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 # PDF generation
 from src.pdf_utils import generate_pdf
 
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
+
+def validate_api_keys():
+    """Validate that required API keys are present."""
+    required_keys = {
+        "GOOGLE_API_KEY": "Google Generative AI"
+    }
+    
+    missing_keys = []
+    for key, service in required_keys.items():
+        if not os.getenv(key):
+            missing_keys.append(f"{service} ({key})")
+    
+    if missing_keys:
+        error_msg = (
+            "Missing required API keys:\n" +
+            "\n".join(f"  - {key}" for key in missing_keys) +
+            "\n\nPlease set these keys in your .env file."
+        )
+        raise EnvironmentError(error_msg)
+
+# Validate API keys before initializing models
+validate_api_keys()
+
 class AgentState(TypedDict):
     mode: str
     num_of_q: int
@@ -56,7 +82,7 @@ interviewer_prompt = PromptTemplate(
         2. `retrieve_resume`: This tool can search the candidate's resume to find information about their past projects and experience. Use this tool to ask relevant projects from their resume like {position} projects.
         Start by introducing yourself as the interviewer and asking the candidate to introduce themselves, then ask use tools to retrive a project of you choice in there resume and ask them about it.
         Focus on questions related to the position and the candidate's resume.
-        You ask only one Introduction question at the beginning of the interview, then one question about a project from there resume then {number_of_questions} questions about the position from the knowledge base with {number_of_followup} flowup question only if there answer was too vage and incomplete.
+        You ask only one Introduction question at the beginning of the interview, then one question about a project from there resume then {number_of_questions} questions about the position from the knowledge base with {number_of_followup} follow-up question only if there answer was too vage and incomplete.
         If asked any irrelevant question, respond with: "Sorry, this is out of scope."
         After the interview is finished you output this sentance exacly: "Thank you, that's it for today."
         if you use any tool print"tool used: `tool_name`"
@@ -65,7 +91,7 @@ interviewer_prompt = PromptTemplate(
         Question one: What challenges do LLMs face in deployment?
         Question twe: What defines a Large Language Model (LLM)?
         `
-        to elistrate between main questions and follow-up questions.
+        to illustrate between main questions and follow-up questions.
         Begin the interview now.
         """
 )
@@ -131,7 +157,7 @@ report_writer_prompt = PromptTemplate(
 # --- Vector Store and Retriever Setup ---
 # Default files
 INTERVIEW_QUESTIONS_PDF = "utils/LLM Interview Questions.pdf"
-DEFAULT_RESUME_PDF = "utils/Mohamed-Mowina-AI-Resume.pdf"
+DEFAULT_RESUME_PDF = "utils/Param-Resume.pdf"
 
 # Text splitter for document processing
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)

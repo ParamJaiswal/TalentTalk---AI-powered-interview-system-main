@@ -387,7 +387,7 @@ if interview_ended and not st.session_state.state.get("evaluation_result"):
                 st.session_state.state["pdf_path"] = pdf_result["pdf_path"]
             
             st.success("Evaluation and report generated successfully!")
-            st.experimental_rerun()
+            st.rerun()
         except Exception as e:
             st.error(f"An error occurred: {str(e)}")
             import traceback

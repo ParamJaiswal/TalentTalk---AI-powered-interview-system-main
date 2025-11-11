@@ -2,6 +2,8 @@
 
 An AI-powered interview system that conducts technical interviews, evaluates responses, and generates comprehensive reports.
 
+**Created by:** Param Jaiswal
+
 ![Workflow](workflow_V2.png)
 
 <p align="center">
@@ -28,10 +30,44 @@ An AI-powered interview system that conducts technical interviews, evaluates res
 
 ## Installation
 
+### Quick Start (Demo Ready!)
+
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/talent-talk.git
-cd talent-talk
+git clone https://github.com/ParamJaiswal/TalentTalk---AI-powered-interview-system-main.git
+cd TalentTalk---AI-powered-interview-system-main
+```
+
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+3. Set up environment variables:
+```bash
+cp .env.example .env
+# Edit .env with your API keys (Google AI, AssemblyAI, ElevenLabs)
+```
+
+4. **Run the application** (with authentication):
+```bash
+streamlit run app.py
+```
+
+5. **Login** with demo credentials:
+   - Username: `admin` / Password: `admin123`
+   - OR Username: `param` / Password: `param123`
+
+6. Choose your interview type and start!
+
+### Alternative: Run Individual Apps
+
+If you prefer to run individual interview applications without the main hub:
+
+1. Clone the repository:
+```bash
+git clone https://github.com/ParamJaiswal/TalentTalk---AI-powered-interview-system-main.git
+cd TalentTalk---AI-powered-interview-system-main
 ```
 
 2. Install dependencies:
@@ -47,7 +83,25 @@ cp .env.example .env
 
 ## Usage
 
-### Text-based Interview
+### Main Application (Recommended)
+
+Run the main application with authentication and navigation:
+
+```bash
+streamlit run app.py
+```
+
+This provides:
+- 🔐 Secure login page
+- 🏠 Navigation hub with all interview types
+- 📊 System status dashboard
+- 🎯 Easy access to all features
+
+### Individual Interview Apps
+
+Alternatively, run individual apps directly:
+
+#### Text-based Interview
 ```bash
 streamlit run text_interview_app.py
 ```
@@ -126,6 +180,18 @@ talent-talk/
 - AssemblyAI (for cloud voice processing)
 - ElevenLabs (for voice responses)
 - FPDF (for PDF generation)
+
+## Security Note
+
+**⚠️ Important**: This application uses a simple authentication system suitable for demonstration and development purposes only. For production deployment:
+
+1. Replace the demo authentication with a production-grade solution
+2. Use proper password hashing (bcrypt, argon2, or scrypt instead of SHA-256)
+3. Store credentials in a secure database, not in code
+4. Implement rate limiting and account lockout mechanisms
+5. Use HTTPS for all connections
+6. Consider adding multi-factor authentication
+7. Regularly update dependencies and scan for vulnerabilities
 
 ## License
 

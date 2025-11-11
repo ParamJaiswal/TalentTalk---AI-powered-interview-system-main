@@ -409,7 +409,7 @@ def example_automated_interview():
     try:
         final_state = run_interview(
             pdf_path="LLM Interview Questions.pdf",
-            resume_path="Mohamed-Mowina-AI-Resume.pdf",
+            resume_path="Param-Resume.pdf",
             position="AI Developer",
             company_name="OpenAI",
             mode="friendly",
@@ -430,7 +430,7 @@ def example_interactive_interview():
     try:
         final_state = run_interactive_interview(
             pdf_path="LLM Interview Questions.pdf",
-            resume_path="Mohamed-Mowina-AI-Resume.pdf",
+            resume_path="Param-Resume.pdf",
             position="AI Developer",
             company_name="OpenAI",
             mode="friendly",
@@ -451,7 +451,7 @@ def example_test_tools():
     try:
         test_tools(
             pdf_path="LLM Interview Questions.pdf",
-            resume_path="Mohamed-Mowina-AI-Resume.pdf"
+            resume_path="Param-Resume.pdf"
         )
         
     except FileNotFoundError as e:
