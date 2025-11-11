@@ -181,6 +181,18 @@ talent-talk/
 - ElevenLabs (for voice responses)
 - FPDF (for PDF generation)
 
+## Security Note
+
+**⚠️ Important**: This application uses a simple authentication system suitable for demonstration and development purposes only. For production deployment:
+
+1. Replace the demo authentication with a production-grade solution
+2. Use proper password hashing (bcrypt, argon2, or scrypt instead of SHA-256)
+3. Store credentials in a secure database, not in code
+4. Implement rate limiting and account lockout mechanisms
+5. Use HTTPS for all connections
+6. Consider adding multi-factor authentication
+7. Regularly update dependencies and scan for vulnerabilities
+
 ## License
 
 [MIT](LICENSE)

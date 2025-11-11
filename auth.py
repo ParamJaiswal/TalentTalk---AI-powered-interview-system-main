@@ -1,6 +1,14 @@
 """
 Authentication helper functions for TalentTalk application.
 Provides simple session-based authentication for Streamlit apps.
+
+SECURITY NOTE: This is a simple authentication system for demonstration purposes.
+In production, you should:
+1. Use a proper password hashing library like bcrypt, argon2, or scrypt
+2. Store credentials in a secure database, not in code
+3. Implement rate limiting and account lockout
+4. Use HTTPS for all connections
+5. Add multi-factor authentication
 """
 
 import streamlit as st
@@ -8,6 +16,7 @@ import hashlib
 from typing import Optional, Dict
 
 # Default user credentials (in production, these should be in a secure database)
+# NOTE: SHA-256 is used here for simplicity in demo. Use bcrypt/argon2 in production.
 DEFAULT_USERS = {
     "admin": {
         "password_hash": hashlib.sha256("admin123".encode()).hexdigest(),
@@ -21,7 +30,13 @@ DEFAULT_USERS = {
 
 
 def hash_password(password: str) -> str:
-    """Hash a password using SHA-256."""
+    """
+    Hash a password using SHA-256.
+    
+    NOTE: This is for demo purposes only. In production, use bcrypt, argon2, or scrypt
+    which are specifically designed for password hashing and are computationally expensive
+    to prevent brute-force attacks.
+    """
     return hashlib.sha256(password.encode()).hexdigest()
 
 
