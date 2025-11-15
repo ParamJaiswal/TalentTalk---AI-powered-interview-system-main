@@ -42,7 +42,31 @@ class AgentState(TypedDict):
 # --- LLM and Embeddings ---
 llm = init_chat_model("google_genai:gemini-2.5-flash-lite-preview-06-17")
 evaluator_llm = init_chat_model("google_genai:gemini-2.5-flash-lite-preview-06-17", temperature=0.0)
-embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+
+# Embeddings fallback chain: Google -> OpenAI -> Local
+# Try Google first (may fail at runtime with quota errors)
+try:
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    print("Primary embeddings initialized: GoogleGenerativeAIEmbeddings")
+except Exception as e:
+    print(f"Failed to initialize Google embeddings: {e}")
+    embeddings = None
+
+# Fallback to OpenAI if available
+if embeddings is None and os.getenv("OPENAI_API_KEY"):
+    try:
+        from langchain_openai import OpenAIEmbeddings
+        embeddings = OpenAIEmbeddings()
+        print("Fallback embeddings initialized: OpenAIEmbeddings")
+    except Exception as e:
+        print(f"Failed to initialize OpenAI embeddings: {e}")
+        embeddings = None
+
+# Final fallback to local embeddings
+if embeddings is None:
+    from src.embeddings_local import LocalSentenceTransformerEmbeddings
+    embeddings = LocalSentenceTransformerEmbeddings()
+    print("Fallback embeddings initialized: LocalSentenceTransformerEmbeddings")
 
 # --- Prompts ---
 interviewer_prompt = PromptTemplate(
@@ -136,6 +160,103 @@ DEFAULT_RESUME_PDF = "data/default_resume.pdf"
 # Text splitter for document processing
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
 
+def build_chroma_from_documents(documents, embeddings_instance, collection_name_prefix):
+    """
+    Build a Chroma vectorstore from documents with runtime fallback on quota errors.
+    
+    This helper catches google.api_core.exceptions.ResourceExhausted (429 quota errors)
+    and automatically falls back to OpenAI or local embeddings, rebuilding the vectorstore.
+    
+    Args:
+        documents: List of documents to embed
+        embeddings_instance: The embeddings instance to use (may be Google, OpenAI, or Local)
+        collection_name_prefix: Prefix for the collection name
+        
+    Returns:
+        Chroma vectorstore instance
+    """
+    import uuid
+    import time
+    
+    session_id = f"{uuid.uuid4().hex}_{int(time.time())}"
+    collection_name = f"{collection_name_prefix}_{session_id}"
+    
+    # Defensive import for streamlit (may not be available in all environments)
+    try:
+        import streamlit as st
+        has_streamlit = True
+    except ImportError:
+        has_streamlit = False
+    
+    # Try with the provided embeddings instance
+    try:
+        vectorstore = Chroma.from_documents(
+            documents=documents,
+            embedding=embeddings_instance,
+            collection_name=collection_name
+        )
+        
+        # Get the backend name
+        backend_name = type(embeddings_instance).__name__
+        print(f"Vectorstore initialized using embeddings backend: {backend_name}")
+        if has_streamlit:
+            st.info(f"Vectorstore initialized using embeddings backend: {backend_name}")
+        
+        return vectorstore
+        
+    except Exception as e:
+        # Check if it's a Google quota error (429)
+        is_quota_error = False
+        try:
+            from google.api_core.exceptions import ResourceExhausted
+            is_quota_error = isinstance(e, ResourceExhausted)
+        except ImportError:
+            # google.api_core not available, check error message
+            is_quota_error = "429" in str(e) or "quota" in str(e).lower()
+        
+        if is_quota_error:
+            warning_msg = f"Google embeddings quota exceeded (429). Falling back to alternative embeddings."
+            print(warning_msg)
+            if has_streamlit:
+                st.warning(warning_msg)
+            
+            # Try OpenAI fallback
+            if os.getenv("OPENAI_API_KEY"):
+                try:
+                    from langchain_openai import OpenAIEmbeddings
+                    openai_embeddings = OpenAIEmbeddings()
+                    vectorstore = Chroma.from_documents(
+                        documents=documents,
+                        embedding=openai_embeddings,
+                        collection_name=collection_name
+                    )
+                    print("Vectorstore initialized using fallback embeddings backend: OpenAIEmbeddings")
+                    if has_streamlit:
+                        st.info("Vectorstore initialized using fallback embeddings backend: OpenAIEmbeddings")
+                    return vectorstore
+                except Exception as openai_error:
+                    print(f"OpenAI fallback failed: {openai_error}")
+            
+            # Final fallback to local embeddings
+            try:
+                from src.embeddings_local import LocalSentenceTransformerEmbeddings
+                local_embeddings = LocalSentenceTransformerEmbeddings()
+                vectorstore = Chroma.from_documents(
+                    documents=documents,
+                    embedding=local_embeddings,
+                    collection_name=collection_name
+                )
+                print("Vectorstore initialized using fallback embeddings backend: LocalSentenceTransformerEmbeddings")
+                if has_streamlit:
+                    st.info("Vectorstore initialized using fallback embeddings backend: LocalSentenceTransformerEmbeddings")
+                return vectorstore
+            except Exception as local_error:
+                print(f"Local embeddings fallback failed: {local_error}")
+                raise
+        else:
+            # Not a quota error, re-raise
+            raise
+
 def initialize_questions_retriever(questions_path=None):
     """
     Initialize the questions retriever with the provided questions PDF path or use the default.
@@ -149,15 +270,8 @@ def initialize_questions_retriever(questions_path=None):
     # Use the provided questions path or fall back to the default
     questions_file = questions_path if questions_path and os.path.exists(questions_path) else INTERVIEW_QUESTIONS_PDF
     
-    # Generate a unique ID for this session to avoid caching issues
-    import uuid
-    import time
-    session_id = f"{uuid.uuid4().hex}_{int(time.time())}"
-    collection_name = f"questions_{session_id}"
-    
     print(f"Loading interview questions from: {questions_file}")
     
-    # Always create a fresh collection for each request
     # Load and split the questions
     loader = PyPDFLoader(questions_file)
     pages = loader.load()
@@ -167,11 +281,11 @@ def initialize_questions_retriever(questions_path=None):
     
     pages_split = text_splitter.split_documents(pages)
     
-    # Initialize the questions vector store with a unique collection name
-    questions_vectorstore = Chroma.from_documents(
-        documents=pages_split, 
-        embedding=embeddings, 
-        collection_name=collection_name
+    # Initialize the questions vector store using the helper with runtime fallback
+    questions_vectorstore = build_chroma_from_documents(
+        documents=pages_split,
+        embeddings_instance=embeddings,
+        collection_name_prefix="questions"
     )
     
     # Create the retriever with search kwargs for better results
@@ -201,15 +315,8 @@ def initialize_resume_retriever(resume_path=None):
     # Use the provided resume path or fall back to the default
     resume_file = resume_path if resume_path and os.path.exists(resume_path) else DEFAULT_RESUME_PDF
     
-    # Generate a unique ID for this session to avoid caching issues
-    import uuid
-    import time
-    session_id = f"{uuid.uuid4().hex}_{int(time.time())}"
-    collection_name = f"resume_{session_id}"
-    
     print(f"Loading resume from: {resume_file}")
     
-    # Always create a fresh collection for each request
     # Load and split the resume
     resume_loader = PyPDFLoader(resume_file)
     resume = resume_loader.load()
@@ -219,11 +326,11 @@ def initialize_resume_retriever(resume_path=None):
     
     resume_split = text_splitter.split_documents(resume)
     
-    # Initialize the resume vector store with a unique collection name
-    resume_vectorstore = Chroma.from_documents(
-        documents=resume_split, 
-        embedding=embeddings, 
-        collection_name=collection_name
+    # Initialize the resume vector store using the helper with runtime fallback
+    resume_vectorstore = build_chroma_from_documents(
+        documents=resume_split,
+        embeddings_instance=embeddings,
+        collection_name_prefix="resume"
     )
     
     # Create the retriever with search kwargs for better results
