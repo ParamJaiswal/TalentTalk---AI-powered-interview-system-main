@@ -35,7 +35,31 @@ class AgentState(TypedDict):
 # --- LLM and Embeddings ---
 llm = init_chat_model("google_genai:gemini-2.5-flash-lite-preview-06-17")
 evaluator_llm = init_chat_model("google_genai:gemini-2.5-flash-lite-preview-06-17", temperature=0.0)
-embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+
+# Embeddings fallback chain: Google -> OpenAI -> Local
+# Try Google first (may fail at runtime with quota errors)
+try:
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    print("Primary embeddings initialized: GoogleGenerativeAIEmbeddings")
+except Exception as e:
+    print(f"Failed to initialize Google embeddings: {e}")
+    embeddings = None
+
+# Fallback to OpenAI if available
+if embeddings is None and os.getenv("OPENAI_API_KEY"):
+    try:
+        from langchain_openai import OpenAIEmbeddings
+        embeddings = OpenAIEmbeddings()
+        print("Fallback embeddings initialized: OpenAIEmbeddings")
+    except Exception as e:
+        print(f"Failed to initialize OpenAI embeddings: {e}")
+        embeddings = None
+
+# Final fallback to local embeddings
+if embeddings is None:
+    from src.embeddings_local import LocalSentenceTransformerEmbeddings
+    embeddings = LocalSentenceTransformerEmbeddings()
+    print("Fallback embeddings initialized: LocalSentenceTransformerEmbeddings")
 
 # --- Prompts ---
 interviewer_prompt = PromptTemplate(

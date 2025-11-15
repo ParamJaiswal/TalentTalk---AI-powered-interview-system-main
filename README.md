@@ -86,9 +86,26 @@ streamlit run voice_interview_app_assemblyai.py
 
 This project uses the following external APIs:
 
-- **AssemblyAI**: For cloud-based speech recognition
-- **ElevenLabs**: For realistic AI voice responses
-- **Google Generative AI**: For the LLM powering the interview
+- **Google Generative AI** (Required): For the LLM powering the interview and primary embeddings
+- **OpenAI** (Optional): Fallback for embeddings when Google quota is exceeded
+- **AssemblyAI** (Optional): For cloud-based speech recognition in voice interviews
+- **ElevenLabs** (Optional): For realistic AI voice responses in voice interviews
+
+### Embedding Fallback System
+
+The system now includes a robust embedding fallback mechanism to ensure demos work even when API quotas are exceeded:
+
+1. **Primary**: Google Generative AI Embeddings (requires `GOOGLE_API_KEY`)
+2. **Fallback 1**: OpenAI Embeddings (requires `OPENAI_API_KEY`)
+3. **Fallback 2**: Local Sentence Transformers (no API key needed - works offline!)
+
+The system automatically detects Google quota errors (HTTP 429) at runtime and seamlessly switches to the next available embedding provider. This makes the application more reliable for demos and development.
+
+**Local Embeddings**: The final fallback uses the `sentence-transformers` library with the `all-MiniLM-L6-v2` model, which:
+- Works completely offline (no internet required after initial model download)
+- Loads lazily in the background to avoid blocking Streamlit
+- Is lightweight and sufficient for demonstration purposes
+- Automatically downloads on first use (~80MB)
 
 ## Directory Structure
 
@@ -97,6 +114,7 @@ talent-talk/
 ├── src/                    # Core source code
 │   ├── workflow.py         # Basic workflow implementation
 │   ├── dynamic_workflow.py # Enhanced workflow with dynamic resume
+│   ├── embeddings_local.py # Local sentence-transformers embeddings wrapper
 │   └── pdf_utils.py        # PDF generation utilities
 ├── utils/                  # Utility functions
 │   └── audio_utils.py      # Audio processing utilities
